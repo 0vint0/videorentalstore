@@ -20,7 +20,6 @@ import javax.persistence.PersistenceException;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -95,7 +94,33 @@ public class MovieRentalServiceImpl implements MovieRentalService {
         movieRental.setActualPeriod(actualPeriod);
         movieRental.setActualPrice(getActualPrice(movieRental));
         incrementMovieRentNumber(movieRental.getMovies(), -1);
+        updateClient(movieRental);
         return new MovieRentalConverter().convert(movieRental);
+    }
+
+    private void updateClient(MovieRental movieRental) {
+        Client client = clientRepository.findOne(movieRental.getClientId());
+        client.setBonusPoints(client.getBonusPoints() + getBonus(movieRental));
+        if (movieRental.getActualPrice().compareTo(movieRental.getOriginalPrice()) != 0) {
+            client.setBalance(movieRental.getActualPrice().subtract(movieRental.getOriginalPrice()));
+        }
+        clientRepository.save(client);
+    }
+
+    private Long getBonus(MovieRental movieRental) {
+        return movieRental.getMovies()
+                .stream()
+                .mapToLong(this::getBonus)
+                .sum();
+    }
+
+    private Long getBonus(Movie movie) {
+        switch (movie.getMovieType()) {
+            case NewRelease:
+                return 2L;
+            default:
+                return 1L;
+        }
     }
 
     private BigDecimal getActualPrice(MovieRental movieRental) {
